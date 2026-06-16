@@ -50,9 +50,9 @@ make seed                     # superadmin role + permissions + initial admin
 make run                      # http://127.0.0.1:8000 — docs at /docs
 ```
 
-Try the slice from `/docs`: **POST `/api/v1/auth/login`** with the seeded
+Try the slice from `/docs`: **POST `/api/v1/admin/auth/login`** with the seeded
 `ADMIN_EMAIL` / `ADMIN_PASSWORD` (email goes in the `username` field), click
-**Authorize** with the returned access token, then call **GET `/api/v1/admins`** — it's
+**Authorize** with the returned access token, then call **GET `/api/v1/admin/admins`** — it's
 guarded by `require_permission("admins", READ)`.
 
 ## Make targets

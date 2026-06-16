@@ -6,8 +6,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.logs.constants import LogAction, LogStatus
 from src.models import Base, str_enum_column
+from src.modules.logs.constants import LogAction, LogStatus
 
 # High-volume, append-only tables: integer PK, single created_at, no soft delete.
 # Consider range partitioning on created_at if these grow large.

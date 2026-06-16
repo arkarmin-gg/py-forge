@@ -1,7 +1,7 @@
 import uuid
 
-from src.rbac import service as rbac_service
-from src.rbac.constants import ActionType
+from src.modules.rbac import service as rbac_service
+from src.modules.rbac.constants import ActionType
 
 
 class _FakeResult:

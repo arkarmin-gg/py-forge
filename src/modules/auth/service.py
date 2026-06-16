@@ -4,12 +4,12 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.admins import service as admin_service
-from src.admins.models import Admin
-from src.auth import security
-from src.auth.config import auth_settings
-from src.auth.exceptions import InactiveAdmin, InvalidCredentials, InvalidToken
-from src.auth.models import RefreshToken
+from src.modules.admins import service as admin_service
+from src.modules.admins.models import Admin
+from src.modules.auth import security
+from src.modules.auth.config import auth_settings
+from src.modules.auth.exceptions import InactiveAdmin, InvalidCredentials, InvalidToken
+from src.modules.auth.models import RefreshToken
 
 
 async def authenticate_admin(db: AsyncSession, email: str, password: str) -> Admin:

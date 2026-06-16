@@ -6,11 +6,11 @@ from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
-from src.admins.models import Admin
-from src.admins.schemas import AdminCreate, AdminUpdate
-from src.auth import security
-from src.rbac.models import Role
+from src.modules.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
+from src.modules.admins.models import Admin
+from src.modules.admins.schemas import AdminCreate, AdminUpdate
+from src.modules.auth import security
+from src.modules.rbac.models import Role
 from src.storage import service as storage
 from src.storage.exceptions import StorageError
 

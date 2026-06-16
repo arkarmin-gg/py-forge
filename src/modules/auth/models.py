@@ -13,8 +13,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.auth.constants import OtpPurpose, OtpStatus
 from src.models import Base, TimestampMixin, UUIDPrimaryKeyMixin, str_enum_column
+from src.modules.auth.constants import OtpPurpose, OtpStatus
 
 # Polymorphic owner: exactly one of user_id / admin_id is set, enforced by a CHECK
 # (DBML can't express this — see DATABASE_ERD.dbml). XOR via "<>" on the two NOT NULL tests.

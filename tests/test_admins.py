@@ -1,11 +1,11 @@
 import uuid
 
 import pytest
-from src.admins import service
-from src.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
-from src.admins.models import Admin
-from src.admins.schemas import AdminCreate, AdminUpdate
-from src.rbac.models import Role
+from src.modules.admins import service
+from src.modules.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
+from src.modules.admins.models import Admin
+from src.modules.admins.schemas import AdminCreate, AdminUpdate
+from src.modules.rbac.models import Role
 from src.storage.schemas import StoredObject
 
 

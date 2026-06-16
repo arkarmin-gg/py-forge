@@ -10,7 +10,7 @@ from src.models import (
     UUIDPrimaryKeyMixin,
     str_enum_column,
 )
-from src.users.constants import LoginProvider, RegistrationStage
+from src.modules.users.constants import LoginProvider, RegistrationStage
 
 
 class User(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):

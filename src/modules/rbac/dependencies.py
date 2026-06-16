@@ -1,11 +1,11 @@
 from collections.abc import Awaitable, Callable
 
-from src.admins.models import Admin
-from src.auth.dependencies import CurrentAdmin
 from src.dependencies import DbSession
-from src.rbac import service as rbac_service
-from src.rbac.constants import ActionType
-from src.rbac.exceptions import PermissionDenied
+from src.modules.admins.models import Admin
+from src.modules.auth.dependencies import CurrentAdmin
+from src.modules.rbac import service as rbac_service
+from src.modules.rbac.constants import ActionType
+from src.modules.rbac.exceptions import PermissionDenied
 
 
 def require_permission(module_code: str, action: ActionType) -> Callable[..., Awaitable[Admin]]:

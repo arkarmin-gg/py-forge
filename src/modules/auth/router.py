@@ -3,17 +3,20 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from src.admins.schemas import AdminRead
-from src.auth import service
-from src.auth.dependencies import CurrentAdmin
-from src.auth.schemas import RefreshRequest, TokenResponse
 from src.dependencies import DbSession
+from src.modules.admins.schemas import AdminRead
+from src.modules.auth import service
+from src.modules.auth.dependencies import CurrentAdmin
+from src.modules.auth.schemas import RefreshRequest, TokenResponse
 from src.schemas import ErrorResponse
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth")
 
 _AUTH_ERRORS = {
-    status.HTTP_401_UNAUTHORIZED: {"model": ErrorResponse, "description": "Authentication failed"},
+    status.HTTP_401_UNAUTHORIZED: {
+        "model": ErrorResponse,
+        "description": "Authentication failed",
+    },
 }
 
 
@@ -39,7 +42,9 @@ async def login(
     responses=_AUTH_ERRORS,
 )
 async def refresh(body: RefreshRequest, db: DbSession) -> TokenResponse:
-    access_token, refresh_token = await service.rotate_refresh_token(db, body.refresh_token)
+    access_token, refresh_token = await service.rotate_refresh_token(
+        db, body.refresh_token
+    )
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 

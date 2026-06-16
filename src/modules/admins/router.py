@@ -3,12 +3,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, UploadFile, status
 
-from src.admins import service
-from src.admins.exceptions import AdminNotFound
-from src.admins.schemas import AdminCreate, AdminRead, AdminUpdate
 from src.dependencies import DbSession
-from src.rbac.constants import ActionType
-from src.rbac.dependencies import require_permission
+from src.modules.admins import service
+from src.modules.admins.exceptions import AdminNotFound
+from src.modules.admins.schemas import AdminCreate, AdminRead, AdminUpdate
+from src.modules.rbac.constants import ActionType
+from src.modules.rbac.dependencies import require_permission
 
 router = APIRouter(
     prefix="/admins",

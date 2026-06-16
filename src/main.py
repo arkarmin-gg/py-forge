@@ -3,13 +3,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, cast
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import src.registry  # noqa: F401  -- register every ORM model so all FKs resolve
-from src.admins.router import router as admins_router
-from src.auth.router import router as auth_router
+from src.api.routers import v1
 from src.config import Environment, settings
 from src.exceptions import AppException
 from src.schemas import ErrorResponse
@@ -62,9 +61,6 @@ def create_app() -> FastAPI:
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         }
 
-    v1 = APIRouter(prefix=settings.API_V1_PREFIX)
-    v1.include_router(auth_router)
-    v1.include_router(admins_router)
     app.include_router(v1)
 
     return app

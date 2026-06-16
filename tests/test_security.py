@@ -1,6 +1,6 @@
 import jwt
 import pytest
-from src.auth import security
+from src.modules.auth import security
 
 
 def test_password_hash_roundtrip() -> None:

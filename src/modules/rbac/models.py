@@ -21,7 +21,7 @@ from src.models import (
     UUIDPrimaryKeyMixin,
     str_enum_column,
 )
-from src.rbac.constants import ActionType
+from src.modules.rbac.constants import ActionType
 
 # Association table between roles and permissions. Composite PK enforces uniqueness
 # and forward lookup; the extra index serves reverse lookup (roles holding a permission).

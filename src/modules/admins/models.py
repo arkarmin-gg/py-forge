@@ -5,7 +5,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models import Base, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
-from src.rbac.models import Role
+from src.modules.rbac.models import Role
 
 
 class Admin(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):

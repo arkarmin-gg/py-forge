@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
 
+from src.modules.users.constants import LoginProvider, RegistrationStage
 from src.schemas import BaseSchema
-from src.users.constants import LoginProvider, RegistrationStage
 
 
 class UserRead(BaseSchema):

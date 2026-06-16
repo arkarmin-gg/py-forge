@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.admins.models import Admin
-from src.rbac.constants import ActionType
-from src.rbac.models import Module, Permission, role_permissions
+from src.modules.admins.models import Admin
+from src.modules.rbac.constants import ActionType
+from src.modules.rbac.models import Module, Permission, role_permissions
 
 
 async def admin_has_permission(

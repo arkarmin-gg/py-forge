@@ -6,9 +6,9 @@ of model modules, so without this some cross-domain FKs (e.g. refresh_tokens -> 
 would fail to resolve when mappers configure.
 """
 
-from src.admins import models as _admins  # noqa: F401
-from src.auth import models as _auth  # noqa: F401
-from src.logs import models as _logs  # noqa: F401
-from src.rbac import models as _rbac  # noqa: F401
-from src.settings import models as _settings  # noqa: F401
-from src.users import models as _users  # noqa: F401
+from src.modules.admins import models as _admins  # noqa: F401
+from src.modules.auth import models as _auth  # noqa: F401
+from src.modules.logs import models as _logs  # noqa: F401
+from src.modules.rbac import models as _rbac  # noqa: F401
+from src.modules.settings import models as _settings  # noqa: F401
+from src.modules.users import models as _users  # noqa: F401
