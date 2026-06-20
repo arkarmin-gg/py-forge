@@ -52,11 +52,12 @@ def create_app() -> FastAPI:
             ).model_dump(),
         )
 
-    @app.get("/health", tags=["health"], summary="Liveness probe")
+    @app.get("/health")
     async def health() -> dict[str, object]:
         return {
             "status": "ok",
             "environment": settings.ENVIRONMENT.value,
+            "app_name": settings.PROJECT_NAME,
             "version": app.version,
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         }

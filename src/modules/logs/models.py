@@ -1,9 +1,8 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models import Base, str_enum_column
@@ -20,7 +19,7 @@ class ActivityLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     action: Mapped[LogAction] = str_enum_column(LogAction, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -62,7 +61,9 @@ class AuditLog(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # SET NULL: audit history survives admin deletion.
     admin_id: Mapped[uuid.UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey("admins.id", ondelete="SET NULL"), nullable=True
+        Uuid,
+        ForeignKey("admins.id", ondelete="SET NULL"),
+        nullable=True,
     )
     action: Mapped[LogAction] = str_enum_column(LogAction, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)

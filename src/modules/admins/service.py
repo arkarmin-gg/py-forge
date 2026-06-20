@@ -6,10 +6,10 @@ from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.modules.admin_auth import security
 from src.modules.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
 from src.modules.admins.models import Admin
 from src.modules.admins.schemas import AdminCreate, AdminUpdate
-from src.modules.auth import security
 from src.modules.rbac.models import Role
 from src.storage import service as storage
 from src.storage.exceptions import StorageError
@@ -35,7 +35,9 @@ async def _ensure_role_exists(db: AsyncSession, role_id: uuid.UUID) -> None:
         raise InvalidRole()
 
 
-async def create(db: AsyncSession, data: AdminCreate) -> Admin:
+async def create(
+    db: AsyncSession, data: AdminCreate, profile_image: UploadFile | None = None
+) -> Admin:
     if await get_by_email(db, data.email) is not None:
         raise AdminEmailConflict()
     await _ensure_role_exists(db, data.role_id)
@@ -47,18 +49,32 @@ async def create(db: AsyncSession, data: AdminCreate) -> Admin:
         role_id=data.role_id,
     )
     db.add(admin)
+    if profile_image is not None:
+        await db.flush()
+        stored = await storage.upload_image(
+            profile_image, prefix=_avatar_prefix(admin.id)
+        )
+        admin.profile_image_key = stored.key
+
     await db.commit()
     await db.refresh(admin)  # populate server defaults (id, created_at, ...)
     return admin
 
 
-async def update(db: AsyncSession, admin_id: uuid.UUID, data: AdminUpdate) -> Admin:
+async def update(
+    db: AsyncSession,
+    admin_id: uuid.UUID,
+    data: AdminUpdate | None,
+    profile_image: UploadFile | None = None,
+) -> Admin:
     admin = await get_by_id(db, admin_id)
     if admin is None:
         raise AdminNotFound()
 
     # exclude_unset drops omitted fields; dropping None protects NOT NULL columns.
-    fields = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    fields = {
+        k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None
+    }
 
     password = fields.pop("password", None)
     if password is not None:
@@ -77,8 +93,22 @@ async def update(db: AsyncSession, admin_id: uuid.UUID, data: AdminUpdate) -> Ad
     for key, value in fields.items():
         setattr(admin, key, value)
 
+    old_profile_image_key = admin.profile_image_key
+    if profile_image is not None:
+        stored = await storage.upload_image(
+            profile_image, prefix=_avatar_prefix(admin_id)
+        )
+        admin.profile_image_key = stored.key
+
     await db.commit()
     await db.refresh(admin)
+    if (
+        profile_image is not None
+        and old_profile_image_key is not None
+        and old_profile_image_key != admin.profile_image_key
+    ):
+        with suppress(StorageError):
+            await storage.delete(old_profile_image_key)
     return admin
 
 
@@ -95,24 +125,6 @@ async def delete(db: AsyncSession, admin_id: uuid.UUID) -> None:
 
 def _avatar_prefix(admin_id: uuid.UUID) -> str:
     return f"admins/{admin_id}/avatar"
-
-
-async def set_profile_image(
-    db: AsyncSession, admin_id: uuid.UUID, file: UploadFile
-) -> Admin:
-    """Upload (or replace) the admin's profile image. Validates type/size, stores the
-    new object, swaps the key, and best-effort removes the previous object."""
-    admin = await get_by_id(db, admin_id)
-    if admin is None:
-        raise AdminNotFound()
-
-    stored = await storage.replace_image(
-        admin.profile_image_key, file, prefix=_avatar_prefix(admin_id)
-    )
-    admin.profile_image_key = stored.key
-    await db.commit()
-    await db.refresh(admin)
-    return admin
 
 
 async def remove_profile_image(db: AsyncSession, admin_id: uuid.UUID) -> Admin:

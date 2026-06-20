@@ -7,10 +7,10 @@ from fastapi.security import OAuth2PasswordBearer
 
 from src.config import settings
 from src.dependencies import DbSession
+from src.modules.admin_auth import security
+from src.modules.admin_auth.exceptions import InactiveAdmin, InvalidToken
 from src.modules.admins import service as admin_service
 from src.modules.admins.models import Admin
-from src.modules.auth import security
-from src.modules.auth.exceptions import InactiveAdmin, InvalidToken
 
 # tokenUrl powers the Swagger "Authorize" button (form login at the admin auth router).
 oauth2_scheme = OAuth2PasswordBearer(
@@ -18,7 +18,9 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 
-async def get_current_admin(token: Annotated[str, Depends(oauth2_scheme)], db: DbSession) -> Admin:
+async def get_current_admin(
+    token: Annotated[str, Depends(oauth2_scheme)], db: DbSession
+) -> Admin:
     try:
         payload = security.decode_access_token(token)
     except jwt.InvalidTokenError as exc:

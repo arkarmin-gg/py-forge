@@ -21,9 +21,8 @@ class AdminRead(BaseSchema):
 
 
 class AdminCreate(BaseModel):
-    """Payload to create an admin. The plaintext password is hashed before storage.
-
-    The profile image is not set here — upload it via PUT /admins/{id}/profile-image.
+    """Multipart form fields to create an admin. The plaintext password is hashed before
+    storage; an optional `profile_image` file is accepted by the route separately.
     """
 
     email: EmailStr
@@ -35,7 +34,7 @@ class AdminCreate(BaseModel):
 class AdminUpdate(BaseModel):
     """Partial update. Only fields sent (and non-null) are applied; omitted fields are
     left untouched. NOT NULL columns can't be cleared through this endpoint by design.
-    The profile image has its own endpoints (PUT/DELETE /admins/{id}/profile-image).
+    An optional `profile_image` file is accepted by the route separately.
     """
 
     email: EmailStr | None = None

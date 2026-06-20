@@ -1,9 +1,9 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 
-from src.dependencies import DbSession
+from src.dependencies import DbSession, form_model
 from src.modules.admins import service
 from src.modules.admins.exceptions import AdminNotFound
 from src.modules.admins.schemas import AdminCreate, AdminRead, AdminUpdate
@@ -13,6 +13,14 @@ from src.modules.rbac.dependencies import require_permission
 router = APIRouter(
     prefix="/admins",
 )
+
+
+async def _admin_create_form(request: Request) -> AdminCreate:
+    return await form_model(request, AdminCreate)
+
+
+async def _admin_update_form(request: Request) -> AdminUpdate:
+    return await form_model(request, AdminUpdate)
 
 
 @router.get(
@@ -30,8 +38,12 @@ async def list_admins(db: DbSession):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission("admins", ActionType.CREATE))],
 )
-async def create_admin(db: DbSession, data: AdminCreate):
-    return await service.create(db, data)
+async def create_admin(
+    db: DbSession,
+    data: Annotated[AdminCreate, Depends(_admin_create_form)],
+    profile_image: Annotated[UploadFile | None, File()] = None,
+):
+    return await service.create(db, data, profile_image=profile_image)
 
 
 @router.get(
@@ -51,8 +63,13 @@ async def get_by_id(db: DbSession, admin_id: uuid.UUID):
     response_model=AdminRead,
     dependencies=[Depends(require_permission("admins", ActionType.UPDATE))],
 )
-async def update_admin(db: DbSession, admin_id: uuid.UUID, data: AdminUpdate):
-    return await service.update(db, admin_id, data)
+async def update_admin(
+    db: DbSession,
+    admin_id: uuid.UUID,
+    data: Annotated[AdminUpdate, Depends(_admin_update_form)],
+    profile_image: Annotated[UploadFile | None, File()] = None,
+):
+    return await service.update(db, admin_id, data, profile_image=profile_image)
 
 
 @router.delete(
@@ -62,17 +79,6 @@ async def update_admin(db: DbSession, admin_id: uuid.UUID, data: AdminUpdate):
 )
 async def delete_admin(db: DbSession, admin_id: uuid.UUID):
     await service.delete(db, admin_id)
-
-
-@router.put(
-    "/{admin_id}/profile-image",
-    response_model=AdminRead,
-    dependencies=[Depends(require_permission("admins", ActionType.UPDATE))],
-)
-async def set_profile_image(
-    db: DbSession, admin_id: uuid.UUID, file: Annotated[UploadFile, File()]
-):
-    return await service.set_profile_image(db, admin_id, file)
 
 
 @router.delete(

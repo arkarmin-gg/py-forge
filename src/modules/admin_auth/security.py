@@ -6,7 +6,7 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
-from src.modules.auth.config import auth_settings
+from src.modules.admin_auth.config import auth_settings
 
 _hasher = PasswordHasher()
 
@@ -38,12 +38,16 @@ def create_access_token(subject: str, extra_claims: dict | None = None) -> str:
     }
     if extra_claims:
         payload.update(extra_claims)
-    return jwt.encode(payload, auth_settings.JWT_SECRET, algorithm=auth_settings.JWT_ALG)
+    return jwt.encode(
+        payload, auth_settings.JWT_SECRET, algorithm=auth_settings.JWT_ALG
+    )
 
 
 def decode_access_token(token: str) -> dict:
     """Decode and verify a JWT. Raises jwt.InvalidTokenError on any failure."""
-    return jwt.decode(token, auth_settings.JWT_SECRET, algorithms=[auth_settings.JWT_ALG])
+    return jwt.decode(
+        token, auth_settings.JWT_SECRET, algorithms=[auth_settings.JWT_ALG]
+    )
 
 
 def generate_refresh_token() -> str:

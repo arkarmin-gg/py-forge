@@ -1,14 +1,16 @@
 from collections.abc import Awaitable, Callable
 
 from src.dependencies import DbSession
+from src.modules.admin_auth.dependencies import CurrentAdmin
 from src.modules.admins.models import Admin
-from src.modules.auth.dependencies import CurrentAdmin
 from src.modules.rbac import service as rbac_service
 from src.modules.rbac.constants import ActionType
 from src.modules.rbac.exceptions import PermissionDenied
 
 
-def require_permission(module_code: str, action: ActionType) -> Callable[..., Awaitable[Admin]]:
+def require_permission(
+    module_code: str, action: ActionType
+) -> Callable[..., Awaitable[Admin]]:
     """Dependency factory enforcing that the current admin's role grants `action` on `module_code`.
 
     Usage:

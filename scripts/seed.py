@@ -13,8 +13,8 @@ import src.registry  # noqa: F401  -- ensure all models are registered
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from src.admin_auth import security
 from src.admins.models import Admin
-from src.auth import security
 from src.database import SessionFactory
 from src.rbac.constants import ActionType
 from src.rbac.models import Module, Permission, Role
