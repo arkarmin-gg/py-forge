@@ -13,11 +13,11 @@ import src.registry  # noqa: F401  -- ensure all models are registered
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from src.admin_auth import security
-from src.admins.models import Admin
 from src.database import SessionFactory
-from src.rbac.constants import ActionType
-from src.rbac.models import Module, Permission, Role
+from src.modules.admin_auth import security
+from src.modules.admins.models import Admin
+from src.modules.rbac.constants import ActionType
+from src.modules.rbac.models import Module, Permission, Role
 
 # Baseline modules — one per domain. Extend as the app grows.
 MODULE_CODES = ["admins", "users", "rbac", "logs", "settings"]

@@ -10,11 +10,13 @@ from fastapi import APIRouter
 from src.config import settings
 from src.modules.admin_auth.router import router as auth_router
 from src.modules.admins.router import router as admins_router
+from src.modules.rbac.router import router as rbac_router
 
 # Administrative endpoints. Auth here is admin auth (Admin model + RBAC).
 admin_router = APIRouter(prefix="/admin")
 admin_router.include_router(auth_router)
 admin_router.include_router(admins_router)
+admin_router.include_router(rbac_router)
 
 # Public mobile/frontend endpoints. Reserved namespace — intentionally empty
 # until the first app-facing module (and its own auth) exists.

@@ -19,3 +19,9 @@ class InactiveAdmin(AppException):
     status_code = status.HTTP_403_FORBIDDEN
     error_code = "inactive_admin"
     detail = "This admin account is banned."
+
+
+class InvalidCurrentPassword(AppException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    error_code = "invalid_current_password"
+    detail = "Current password is incorrect."

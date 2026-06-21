@@ -42,3 +42,13 @@ class AdminUpdate(BaseModel):
     password: str | None = Field(default=None, min_length=8, max_length=128)
     role_id: uuid.UUID | None = None
     is_banned: bool | None = None
+
+
+class AdminProfileUpdate(BaseModel):
+    """Partial self-service profile update. Role, ban status, and password changes
+    stay out of this schema because they have separate privilege or security rules.
+    An optional `profile_image` file is accepted by the route separately.
+    """
+
+    email: EmailStr | None = None
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)

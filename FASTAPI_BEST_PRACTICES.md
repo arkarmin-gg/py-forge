@@ -44,7 +44,7 @@ src/
 **Cross-domain imports**: always use the explicit module name. Never `from src.admin_auth import *`.
 
 ```python
-from src.admin_auth import constants as auth_constants
+from src.auth import constants as auth_constants
 from src.notifications import service as notification_service
 from src.posts.constants import ErrorCode as PostsErrorCode
 ```

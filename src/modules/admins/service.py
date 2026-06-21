@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.modules.admin_auth import security
 from src.modules.admins.exceptions import AdminEmailConflict, AdminNotFound, InvalidRole
 from src.modules.admins.models import Admin
-from src.modules.admins.schemas import AdminCreate, AdminUpdate
+from src.modules.admins.schemas import AdminCreate, AdminProfileUpdate, AdminUpdate
 from src.modules.rbac.models import Role
 from src.storage import service as storage
 from src.storage.exceptions import StorageError
@@ -89,6 +89,52 @@ async def update(
     new_role_id = fields.get("role_id")
     if new_role_id is not None and new_role_id != admin.role_id:
         await _ensure_role_exists(db, new_role_id)
+
+    for key, value in fields.items():
+        setattr(admin, key, value)
+
+    old_profile_image_key = admin.profile_image_key
+    if profile_image is not None:
+        stored = await storage.upload_image(
+            profile_image, prefix=_avatar_prefix(admin_id)
+        )
+        admin.profile_image_key = stored.key
+
+    await db.commit()
+    await db.refresh(admin)
+    if (
+        profile_image is not None
+        and old_profile_image_key is not None
+        and old_profile_image_key != admin.profile_image_key
+    ):
+        with suppress(StorageError):
+            await storage.delete(old_profile_image_key)
+    return admin
+
+
+async def update_profile(
+    db: AsyncSession,
+    admin_id: uuid.UUID,
+    data: AdminProfileUpdate | None,
+    profile_image: UploadFile | None = None,
+) -> Admin:
+    admin = await get_by_id(db, admin_id)
+    if admin is None:
+        raise AdminNotFound()
+
+    fields = {}
+    if data is not None:
+        fields = {
+            k: v
+            for k, v in data.model_dump(exclude_unset=True).items()
+            if v is not None
+        }
+
+    new_email = fields.get("email")
+    if new_email is not None and new_email != admin.email:
+        existing = await get_by_email(db, new_email)
+        if existing is not None and existing.id != admin.id:
+            raise AdminEmailConflict()
 
     for key, value in fields.items():
         setattr(admin, key, value)

@@ -9,6 +9,7 @@ from src.modules.admin_auth.config import auth_settings
 from src.modules.admin_auth.exceptions import (
     InactiveAdmin,
     InvalidCredentials,
+    InvalidCurrentPassword,
     InvalidToken,
 )
 from src.modules.admin_auth.models import RefreshToken
@@ -86,4 +87,36 @@ async def logout(db: AsyncSession, admin_id: uuid.UUID) -> None:
     admin = await admin_service.get_by_id(db, admin_id)
     if admin is not None:
         admin.last_logout_at = datetime.now(UTC)
+    await db.commit()
+
+
+async def change_password(
+    db: AsyncSession,
+    admin: Admin,
+    current_password: str,
+    new_password: str,
+) -> None:
+    if admin.password is None or not security.verify_password(
+        current_password, admin.password
+    ):
+        raise InvalidCurrentPassword()
+
+    admin.password = security.hash_password(new_password)
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.admin_id == admin.id, RefreshToken.is_revoked.is_(False))
+        .values(is_revoked=True)
+    )
+    await db.commit()
+
+
+async def delete_me(db: AsyncSession, admin: Admin) -> None:
+    now = datetime.now(UTC)
+    admin.deleted_at = now
+    admin.last_logout_at = now
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.admin_id == admin.id, RefreshToken.is_revoked.is_(False))
+        .values(is_revoked=True)
+    )
     await db.commit()

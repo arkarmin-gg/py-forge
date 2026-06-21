@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import TypeVar
 
 from sqlalchemy import DateTime, MetaData, Uuid, func, text
 from sqlalchemy import Enum as SAEnum
@@ -51,10 +50,7 @@ class SoftDeleteMixin:
     )
 
 
-EnumT = TypeVar("EnumT", bound=StrEnum)
-
-
-def str_enum_column(
+def str_enum_column[EnumT: StrEnum](
     enum_cls: type[EnumT], length: int = 50, **kwargs: object
 ) -> Mapped:
     """A VARCHAR-backed enum column (see ADR 0001).
