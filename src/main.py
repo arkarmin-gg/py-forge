@@ -27,11 +27,8 @@ def create_app() -> FastAPI:
         "title": settings.PROJECT_NAME,
         "version": "0.1.0",
         "lifespan": lifespan,
+        "openapi_url": (None),
     }
-    if settings.ENVIRONMENT not in SHOW_DOCS_IN:
-        app_kwargs["openapi_url"] = (
-            None  # disables /docs and /redoc outside local/staging
-        )
 
     app = FastAPI(**app_kwargs)
 
@@ -47,9 +44,7 @@ def create_app() -> FastAPI:
     async def _handle_app_exception(_: Request, exc: AppException) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
-            content=ErrorResponse(
-                error_code=exc.error_code, detail=exc.detail
-            ).model_dump(),
+            content=ErrorResponse(error_code=exc.error_code, detail=exc.detail).model_dump(),
         )
 
     @app.get("/health")

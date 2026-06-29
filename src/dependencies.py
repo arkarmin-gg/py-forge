@@ -19,10 +19,9 @@ async def form_model[ModelT: BaseModel](request: Request, schema: type[ModelT]) 
             return schema.model_validate_json(raw_data)
 
         values = {
-            field_name: form[field_name]
-            for field_name in schema.model_fields
-            if field_name in form
+            field_name: form[field_name] for field_name in schema.model_fields if field_name in form
         }
+
         return schema.model_validate(values)
     except ValidationError as exc:
         raise RequestValidationError(exc.errors()) from exc

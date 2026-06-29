@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from src.modules.admins.models import Admin
-from src.modules.rbac.constants import ActionType
+from src.modules.rbac.constants import SUPERADMIN_ROLE_NAME, ActionType
 from src.modules.rbac.exceptions import (
     InvalidPermission,
     ProtectedRole,
@@ -16,24 +16,18 @@ from src.modules.rbac.exceptions import (
 )
 from src.modules.rbac.models import Module, Permission, Role, role_permissions
 from src.modules.rbac.schemas import RoleCreate, RoleUpdate
-
-SUPERADMIN_ROLE_NAME = "superadmin"
+from src.pagination import Page, PaginationParams, paginate
 
 
 async def admin_has_permission(
     db: AsyncSession, admin: Admin, module_code: str, action: ActionType
 ) -> bool:
-    """True if the admin's role grants `action` on the module identified by `module_code`.
-
-    Soft-deleted permissions/modules are excluded automatically by the global filter,
-    so a revoked module or permission can't accidentally grant access.
-    """
     stmt = (
         select(Permission.id)
-        .join(role_permissions, role_permissions.c.permission_id == Permission.id)
+        .join(role_permissions, role_permissions.columns.permission_id == Permission.id)
         .join(Module, Module.id == Permission.module_id)
         .where(
-            role_permissions.c.role_id == admin.role_id,
+            role_permissions.columns.role_id == admin.role_id,
             Module.code == module_code,
             Permission.action == action,
         )
@@ -43,13 +37,14 @@ async def admin_has_permission(
     return result.first() is not None
 
 
-async def list_roles(db: AsyncSession) -> list[Role]:
-    result = await db.execute(
+async def list_roles(db: AsyncSession, pagination: PaginationParams) -> Page[Role]:
+    stmt = (
         select(Role)
         .options(selectinload(Role.permissions).joinedload(Permission.module))
         .order_by(Role.rank.asc(), Role.name.asc())
     )
-    return list(result.scalars().all())
+    count_stmt = select(func.count(Role.id))
+    return await paginate(db, stmt, count_stmt, pagination)
 
 
 async def list_permissions(db: AsyncSession) -> list[Permission]:
@@ -134,9 +129,7 @@ async def update_role(db: AsyncSession, role_id: uuid.UUID, data: RoleUpdate) ->
 
     should_replace_permissions = "permission_ids" in data.model_fields_set
     permissions = (
-        await _resolve_permissions(db, data.permission_ids)
-        if should_replace_permissions
-        else None
+        await _resolve_permissions(db, data.permission_ids) if should_replace_permissions else None
     )
 
     fields = data.model_dump(exclude_unset=True)
@@ -174,18 +167,3 @@ async def delete_role(db: AsyncSession, role_id: uuid.UUID) -> None:
 
     role.deleted_at = datetime.now(UTC)
     await db.commit()
-
-
-async def replace_role_permissions(
-    db: AsyncSession, role_id: uuid.UUID, permission_ids: list[uuid.UUID]
-) -> Role:
-    role = await _require_role(db, role_id)
-    _ensure_role_is_mutable(role)
-
-    permissions = await _resolve_permissions(db, permission_ids)
-    role.permissions = permissions
-    await db.commit()
-    updated = await get_role_by_id(db, role.id)
-    if updated is None:
-        raise RoleNotFound()
-    return updated

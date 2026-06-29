@@ -14,8 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.database import SessionFactory
-from src.modules.admin_auth import security
 from src.modules.admins.models import Admin
+from src.modules.auth import security
 from src.modules.rbac.constants import ActionType
 from src.modules.rbac.models import Module, Permission, Role
 

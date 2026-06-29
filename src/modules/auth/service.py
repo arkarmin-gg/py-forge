@@ -4,17 +4,17 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.modules.admin_auth import security
-from src.modules.admin_auth.config import auth_settings
-from src.modules.admin_auth.exceptions import (
+from src.modules.admins import service as admin_service
+from src.modules.admins.models import Admin
+from src.modules.auth import security
+from src.modules.auth.config import auth_settings
+from src.modules.auth.exceptions import (
     InactiveAdmin,
     InvalidCredentials,
     InvalidCurrentPassword,
     InvalidToken,
 )
-from src.modules.admin_auth.models import RefreshToken
-from src.modules.admins import service as admin_service
-from src.modules.admins.models import Admin
+from src.modules.auth.models import RefreshToken
 
 
 async def authenticate_admin(db: AsyncSession, email: str, password: str) -> Admin:
@@ -34,8 +34,7 @@ async def _issue_refresh_token(db: AsyncSession, admin_id: uuid.UUID) -> str:
         RefreshToken(
             token_hash=security.hash_refresh_token(raw),
             admin_id=admin_id,
-            expires_at=datetime.now(UTC)
-            + timedelta(days=auth_settings.REFRESH_TOKEN_EXP_DAYS),
+            expires_at=datetime.now(UTC) + timedelta(days=auth_settings.REFRESH_TOKEN_EXP_DAYS),
         )
     )
     return raw
@@ -53,9 +52,7 @@ async def login(db: AsyncSession, email: str, password: str) -> tuple[str, str]:
 async def rotate_refresh_token(db: AsyncSession, raw_token: str) -> tuple[str, str]:
     """Revoke the presented refresh token and issue a fresh access + refresh pair."""
     token_hash = security.hash_refresh_token(raw_token)
-    result = await db.execute(
-        select(RefreshToken).where(RefreshToken.token_hash == token_hash)
-    )
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     stored = result.scalar_one_or_none()
     now = datetime.now(UTC)
     if (
@@ -96,9 +93,7 @@ async def change_password(
     current_password: str,
     new_password: str,
 ) -> None:
-    if admin.password is None or not security.verify_password(
-        current_password, admin.password
-    ):
+    if admin.password is None or not security.verify_password(current_password, admin.password):
         raise InvalidCurrentPassword()
 
     admin.password = security.hash_password(new_password)

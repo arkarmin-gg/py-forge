@@ -4,15 +4,15 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from src.dependencies import DbSession, form_model
-from src.modules.admin_auth import service
-from src.modules.admin_auth.dependencies import CurrentAdmin
-from src.modules.admin_auth.schemas import (
+from src.modules.admins import service as admin_service
+from src.modules.admins.schemas import AdminProfileUpdate, AdminRead
+from src.modules.auth import service
+from src.modules.auth.dependencies import CurrentAdmin
+from src.modules.auth.schemas import (
     ChangePasswordRequest,
     RefreshRequest,
     TokenResponse,
 )
-from src.modules.admins import service as admin_service
-from src.modules.admins.schemas import AdminProfileUpdate, AdminRead
 
 router = APIRouter(prefix="/auth")
 
@@ -37,9 +37,7 @@ async def login(
     response_model=TokenResponse,
 )
 async def refresh(body: RefreshRequest, db: DbSession) -> TokenResponse:
-    access_token, refresh_token = await service.rotate_refresh_token(
-        db, body.refresh_token
-    )
+    access_token, refresh_token = await service.rotate_refresh_token(db, body.refresh_token)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -63,9 +61,7 @@ async def update_me(
     data: Annotated[AdminProfileUpdate, Depends(_admin_profile_update_form)],
     profile_image: Annotated[UploadFile | None, File()] = None,
 ):
-    return await admin_service.update_profile(
-        db, admin.id, data, profile_image=profile_image
-    )
+    return await admin_service.update_profile(db, admin.id, data, profile_image=profile_image)
 
 
 @router.patch(

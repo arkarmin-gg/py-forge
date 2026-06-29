@@ -2,10 +2,14 @@
 
 A FastAPI + SQLAlchemy + Postgres backend starter — a Python port of the NestJS
 `nest-forge` project. It ships an identity / RBAC / auth / logging foundation: every
-table from the data model, all the infrastructure, and **one fully working vertical
-slice** (admin login → JWT + refresh token → permission-guarded route) that locks in
-the patterns. The other domains are modeled but their routes/services are stubs for you
-to grow.
+table from the data model, all the infrastructure, and a working **admin console** API.
+
+The API is split by audience under the version prefix: `/admin` (back-office, governed
+by the Admin model + RBAC) and `/app` (mobile/frontend — a reserved namespace, still
+empty). On the admin side, **auth**, **admins**, **rbac**, and **settings** are fully
+implemented with CRUD routes; **logs** exposes audit-log listing (the Activity Log for
+end Users is modeled but has no endpoint yet). The **users** domain is modeled only —
+its `/app` routes and services are the main thing left for you to grow.
 
 See [CONTEXT.md](CONTEXT.md) for the domain glossary and [docs/adr/](docs/adr/) for the
 decisions that aren't obvious from the code.
@@ -20,17 +24,26 @@ asyncpg · Alembic · Pydantic v2 / pydantic-settings · PyJWT · argon2-cffi ·
 ```
 src/
 ├── config.py        database.py      models.py (Base + mixins, soft-delete)
-├── exceptions.py    dependencies.py  constants.py    main.py     registry.py
-├── auth/      login/logout/refresh, JWT, password hashing, refresh_tokens + otp_records
-├── admins/    admin entity + the example protected route
-├── users/     user entity (phone/SMS/social) — modeled, stubbed
-├── rbac/      roles, modules, permissions, role_permissions + require_permission()
-├── logs/      activity_logs + audit_logs — modeled, stubbed
-└── settings/  settings key/value store — modeled, stubbed
+├── exceptions.py    dependencies.py  constants.py     main.py     registry.py
+├── schemas.py       request/response base models (ErrorResponse, RequestSchema, ResponseSchema)
+├── pagination.py    Page / PaginationParams / paginate() / get_all()
+├── query_filters.py where_if_not_none / where_gte_if_not_none / where_lte_if_not_none
+├── api/routers.py   top-level router assembly: /admin and /app under the version prefix
+├── storage/         S3 client + presigned URLs (own BaseSettings)
+└── modules/
+    ├── auth/      login/logout/refresh, JWT, password hashing, refresh_tokens + otp_records, /me
+    ├── admins/    admin entity + full CRUD (the example protected routes)
+    ├── users/     user entity (phone/SMS/social) — modeled only, not wired to routes
+    ├── rbac/      roles, modules, permissions, role_permissions + require_permission()
+    ├── logs/      activity_logs (modeled) + audit_logs (listing endpoint)
+    └── settings/  settings key/value store — full CRUD by key
 migrations/    Alembic (async)
 scripts/seed.py
-tests/         unit tests (no database)
+tests/         (empty — see Testing below)
 ```
+
+`src/registry.py` imports every model module for its side effects so `Base.metadata` is
+complete; import it wherever the full schema is needed (app, Alembic, seed).
 
 ## Prerequisites
 
@@ -69,12 +82,15 @@ guarded by `require_permission("admins", READ)`.
 
 ## Testing
 
-Tests are **unit-only and never touch a database** (Argon2 round-trip, JWT
-encode/decode, the permission-check branch against a fake session). This is a deliberate
-starting point that trades the doc's "use a real DB, never mock it" rule for fast,
-dependency-free CI — see `tests/`. When you're ready for integration tests, add a
-Postgres (a CI `services:` container or testcontainers) and override `get_db` via
-FastAPI's `dependency_overrides`; **don't** "fix" the unit tests by mocking persistence.
+There are **no tests yet** — `tests/` holds only an empty `__init__.py`, and `make test`
+runs pytest against an empty suite. Pytest is wired up (`pytest` + `pytest-asyncio`,
+`asyncio_mode = "auto"` in `pyproject.toml`), so you can start adding tests immediately.
+
+The intended starting point is **unit tests that never touch a database** (Argon2
+round-trip, JWT encode/decode, the permission-check branch against a fake session) —
+fast, dependency-free CI. When you're ready for integration tests, add a Postgres (a CI
+`services:` container or testcontainers) and override `get_db` via FastAPI's
+`dependency_overrides`; **don't** mock persistence to make tests pass.
 
 ## Conventions baked in
 
@@ -84,5 +100,14 @@ FastAPI's `dependency_overrides`; **don't** "fix" the unit tests by mocking pers
   default; opt in with `stmt.execution_options(include_deleted=True)` ([ADR 0002](docs/adr/0002-automatic-soft-delete-filter.md)).
 - Server-side `gen_random_uuid()` UUID PKs; Argon2id password hashing; refresh tokens
   rotated on use and stored only as a hash.
-- One `BaseSettings` per domain (`src/config.py` + `src/auth/config.py`).
+- One `BaseSettings` per domain — global `src/config.py`, plus `src/modules/auth/config.py`
+  (`AUTH_` prefix) and `src/storage/config.py` (`S3_` prefix).
+- **Offset/limit pagination** — list endpoints return `Page[T]` via `src/pagination.py`
+  (`paginate()` + the `pagination_params` dependency) ([ADR 0005](docs/adr/0005-offset-limit-pagination.md)).
+- **Composable query filters** — `src/query_filters.py` `where_*_if_not_none` helpers build
+  optional `WHERE` clauses while preserving the statement's exact type.
+- **Audience-split API** — `/admin` (Admin + RBAC) vs `/app` (mobile/frontend), assembled in
+  `src/api/routers.py` ([ADR 0003](docs/adr/0003-api-audience-namespace-split.md)).
+- **Central model registry** — `src/registry.py` populates `Base.metadata` for app, Alembic,
+  and seed ([ADR 0004](docs/adr/0004-model-registry-metadata.md)).
 - `/docs` and `/redoc` are disabled outside `local` / `staging`.

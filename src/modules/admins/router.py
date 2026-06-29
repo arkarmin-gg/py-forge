@@ -6,9 +6,15 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from src.dependencies import DbSession, form_model
 from src.modules.admins import service
 from src.modules.admins.exceptions import AdminNotFound
-from src.modules.admins.schemas import AdminCreate, AdminRead, AdminUpdate
+from src.modules.admins.schemas import (
+    AdminCreate,
+    AdminListResponse,
+    AdminRead,
+    AdminUpdate,
+)
 from src.modules.rbac.constants import ActionType
 from src.modules.rbac.dependencies import require_permission
+from src.pagination import PaginationParams, pagination_params
 
 router = APIRouter(
     prefix="/admins",
@@ -25,11 +31,14 @@ async def _admin_update_form(request: Request) -> AdminUpdate:
 
 @router.get(
     "/",
-    response_model=list[AdminRead],
+    response_model=AdminListResponse,
     dependencies=[Depends(require_permission("admins", ActionType.READ))],
 )
-async def list_admins(db: DbSession):
-    return await service.list_admins(db)
+async def list_admins(
+    db: DbSession,
+    pagination: Annotated[PaginationParams, Depends(pagination_params)],
+):
+    return await service.list_admins(db, pagination)
 
 
 @router.post(

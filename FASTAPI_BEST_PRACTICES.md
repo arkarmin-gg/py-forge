@@ -18,6 +18,11 @@ Pin to these versions or newer. Examples in this file assume them.
 | PyJWT             | 2.9     | Use this, not the unmaintained `python-jose`             |
 | ruff              | 0.6     | Replaces black, isort, autoflake                         |
 
+> The minimums above are the floor. **py-forge itself targets Python 3.13** and the
+> examples below use 3.13-only syntax: the `type X = ...` alias statement (PEP 695) and
+> inline generics (`def f[T: Bound](...)`, `class Page[ItemT]`). On 3.11/3.12 you'd fall
+> back to `TypeAlias` and `TypeVar`.
+
 ## Project Structure
 
 Organize by domain, not by file type. One package per bounded context.
@@ -41,7 +46,7 @@ src/
 └── main.py             # FastAPI app + lifespan
 ```
 
-**Cross-domain imports**: always use the explicit module name. Never `from src.admin_auth import *`.
+**Cross-domain imports**: always use the explicit module name. Never `from src.auth import *`.
 
 ```python
 from src.auth import constants as auth_constants
@@ -281,6 +286,109 @@ metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 - Do joins, aggregation, and JSON shaping in SQL — Postgres is faster than CPython at this.
 - Hydrate the result into Pydantic only for response validation, not for transformation.
 
+## Pagination (project pattern)
+
+List endpoints return a typed `Page[T]` envelope. The machinery lives in
+`src/pagination.py` — reuse it instead of hand-rolling `limit`/`offset` per route.
+See [ADR 0005](docs/adr/0005-offset-limit-pagination.md) for why offset/limit over cursors.
+
+```python
+# src/pagination.py
+class PaginationParams(BaseModel):
+    limit: int = DEFAULT_PAGE_SIZE
+    offset: int = 0
+
+
+class Page[ItemT](BaseModel):
+    items: list[ItemT]
+    total: int
+    limit: int
+    offset: int
+
+
+def pagination_params(
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> PaginationParams: ...
+
+
+async def paginate[ItemT](
+    db: AsyncSession,
+    stmt: Select[tuple[ItemT]],
+    count_stmt: Select[tuple[int]],
+    pagination: PaginationParams,
+) -> Page[ItemT]: ...
+```
+
+```python
+# In a router: inject the params, build the two statements, hand both to paginate().
+Pagination = Annotated[PaginationParams, Depends(pagination_params)]
+
+@router.get("")
+async def list_admins(db: DbSession, pagination: Pagination) -> Page[AdminRead]:
+    stmt = select(Admin).order_by(Admin.created_at.desc())
+    count_stmt = select(func.count(Admin.id))
+    return await paginate(db, stmt, count_stmt, pagination)
+```
+
+> Build the `count_stmt` from the **same filters** as the data statement (see below), or
+> `total` won't match the filtered result set. Use `get_all()` only for genuinely small,
+> unbounded lists (e.g. the permission catalog).
+
+## Dynamic filtering (project pattern)
+
+`src/query_filters.py` provides `where_if_not_none`, `where_gte_if_not_none`, and
+`where_lte_if_not_none` for optional filters — apply them to **both** the data and the
+count statement so the two stay in sync.
+
+```python
+# src/query_filters.py — note the generic bound: the helper returns the SAME Select
+# subtype it was given, so chaining preserves Select[tuple[AuditLog]] vs Select[tuple[int]].
+type Column = ColumnElement[Any] | InstrumentedAttribute[Any]
+
+def where_if_not_none[StmtT: Select[Any]](
+    stmt: StmtT, column: Column, value: object | None
+) -> StmtT:
+    if value is None:
+        return stmt
+    return stmt.where(column == value)
+```
+
+```python
+# Apply the same filters to data + count via one generic helper.
+def _apply_filters[StmtT: Select[Any]](stmt: StmtT, f: AuditLogFilters) -> StmtT:
+    stmt = where_if_not_none(stmt, AuditLog.admin_id, f.admin_id)
+    stmt = where_gte_if_not_none(stmt, AuditLog.created_at, f.created_from)
+    return stmt
+
+data = _apply_filters(select(AuditLog), filters)
+count = _apply_filters(select(func.count(AuditLog.id)), filters)
+```
+
+> **Why the `Column` alias accepts `InstrumentedAttribute`**: a mapped attribute
+> (`AuditLog.admin_id`) is typed `InstrumentedAttribute[...]`, which type checkers do not
+> treat as a `ColumnElement` even though it is one at runtime. Widening the parameter to
+> the union keeps the helpers callable on model columns without `# type: ignore`.
+
+## API audience split (project pattern)
+
+Routes are split by audience inside the version prefix in `src/api/routers.py`:
+`/admin` (back-office — Admin model + RBAC auth) and `/app` (mobile/frontend, with its own
+auth). Each domain router is mounted under exactly one audience. See
+[ADR 0003](docs/adr/0003-api-audience-namespace-split.md).
+
+```python
+admin_router = APIRouter(prefix="/admin")   # Admin + RBAC auth
+admin_router.include_router(auth_router)
+admin_router.include_router(admins_router)
+
+app_router = APIRouter(prefix="/app")        # reserved for app-facing modules
+
+v1 = APIRouter(prefix=settings.API_V1_PREFIX)
+v1.include_router(admin_router)
+v1.include_router(app_router)
+```
+
 ## Background work — BackgroundTasks vs Celery
 
 | Use BackgroundTasks when…                | Use Celery / Arq / RQ when…                  |
@@ -336,7 +444,7 @@ async def test_create_post(client: AsyncClient):
 Don't monkeypatch internals. Use FastAPI's built-in `dependency_overrides`.
 
 ```python
-from src.admin_auth.dependencies import parse_jwt_data
+from src.auth.dependencies import parse_jwt_data
 from src.main import app
 
 
@@ -417,22 +525,22 @@ Add to a pre-commit hook or run in CI. Ruff replaces black + isort + autoflake +
 If you're an agent reviewing a diff, check for these. Each is a real failure mode I've
 seen agents introduce.
 
-| Anti-pattern                                                                            | Why it's wrong                                       | Fix                                                                                                                   |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `requests.get(...)` inside `async def`                                                  | Blocks the event loop. `requests` is sync.           | Use `httpx.AsyncClient` or `await run_in_threadpool(requests.get, ...)`.                                              |
-| `time.sleep` / `open()` / sync DB driver inside `async def`                             | Same — blocks the loop.                              | Use the async equivalent (`asyncio.sleep`, `aiofiles`, async driver).                                                 |
-| `from jose import jwt`                                                                  | `python-jose` is unmaintained.                       | `import jwt` (PyJWT).                                                                                                 |
-| `from async_asgi_testclient import TestClient`                                          | Unmaintained.                                        | `httpx.AsyncClient` + `ASGITransport`.                                                                                |
-| `model_config = ConfigDict(json_encoders={...})`                                        | Deprecated in Pydantic v2.                           | `@field_serializer` or `Annotated[T, PlainSerializer(...)]`.                                                          |
-| `Field(ge=18, default=None)`                                                            | Constraint contradicts the default.                  | Pick required or optional, not both.                                                                                  |
-| `def get_user(id: int = Depends(...))` (default-arg form)                               | Legacy; gotchas with default values.                 | `user: Annotated[User, Depends(...)]`.                                                                                |
-| Catching `Exception` around a route's body                                              | Hides bugs and turns 500s into silent 200s.          | Catch the specific exception class; raise `HTTPException` with a meaningful status.                                   |
-| `BackgroundTasks` for anything you'd page on                                            | No retry, dies with the worker.                      | Use Celery / Arq / RQ.                                                                                                |
-| Calling a sync ORM session inside `async def`                                           | Blocks the loop, may deadlock the pool.              | Use `AsyncSession`.                                                                                                   |
-| Returning a Pydantic model and _also_ setting `response_model=` to that same class      | Model gets constructed twice (validate + serialize). | Either return a `dict`/ORM row and let `response_model` validate, or drop `response_model` and trust the return type. |
-| Importing across domains via deep paths (`from src.admin_auth.service.user import ...`) | Tight coupling, hard to refactor.                    | `from src.admin_auth import service as auth_service`.                                                                 |
-| Reusing one `BaseSettings` for the whole app                                            | Hard to reason about, every domain reads every var.  | One `BaseSettings` per domain.                                                                                        |
-| Mocking the database in integration tests                                               | Mock/prod divergence eventually fires in prod.       | Use a real DB (testcontainers, ephemeral schema) and `dependency_overrides` for auth/external services.               |
+| Anti-pattern                                                                       | Why it's wrong                                       | Fix                                                                                                                   |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `requests.get(...)` inside `async def`                                             | Blocks the event loop. `requests` is sync.           | Use `httpx.AsyncClient` or `await run_in_threadpool(requests.get, ...)`.                                              |
+| `time.sleep` / `open()` / sync DB driver inside `async def`                        | Same — blocks the loop.                              | Use the async equivalent (`asyncio.sleep`, `aiofiles`, async driver).                                                 |
+| `from jose import jwt`                                                             | `python-jose` is unmaintained.                       | `import jwt` (PyJWT).                                                                                                 |
+| `from async_asgi_testclient import TestClient`                                     | Unmaintained.                                        | `httpx.AsyncClient` + `ASGITransport`.                                                                                |
+| `model_config = ConfigDict(json_encoders={...})`                                   | Deprecated in Pydantic v2.                           | `@field_serializer` or `Annotated[T, PlainSerializer(...)]`.                                                          |
+| `Field(ge=18, default=None)`                                                       | Constraint contradicts the default.                  | Pick required or optional, not both.                                                                                  |
+| `def get_user(id: int = Depends(...))` (default-arg form)                          | Legacy; gotchas with default values.                 | `user: Annotated[User, Depends(...)]`.                                                                                |
+| Catching `Exception` around a route's body                                         | Hides bugs and turns 500s into silent 200s.          | Catch the specific exception class; raise `HTTPException` with a meaningful status.                                   |
+| `BackgroundTasks` for anything you'd page on                                       | No retry, dies with the worker.                      | Use Celery / Arq / RQ.                                                                                                |
+| Calling a sync ORM session inside `async def`                                      | Blocks the loop, may deadlock the pool.              | Use `AsyncSession`.                                                                                                   |
+| Returning a Pydantic model and _also_ setting `response_model=` to that same class | Model gets constructed twice (validate + serialize). | Either return a `dict`/ORM row and let `response_model` validate, or drop `response_model` and trust the return type. |
+| Importing across domains via deep paths (`from src.auth.service.user import ...`)  | Tight coupling, hard to refactor.                    | `from src.auth import service as auth_service`.                                                                       |
+| Reusing one `BaseSettings` for the whole app                                       | Hard to reason about, every domain reads every var.  | One `BaseSettings` per domain.                                                                                        |
+| Mocking the database in integration tests                                          | Mock/prod divergence eventually fires in prod.       | Use a real DB (testcontainers, ephemeral schema) and `dependency_overrides` for auth/external services.               |
 
 ## Quick reference
 

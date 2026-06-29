@@ -23,8 +23,6 @@ from src.models import (
 )
 from src.modules.rbac.constants import ActionType
 
-# Association table between roles and permissions. Composite PK enforces uniqueness
-# and forward lookup; the extra index serves reverse lookup (roles holding a permission).
 role_permissions = Table(
     "role_permissions",
     Base.metadata,
@@ -49,9 +47,7 @@ class Role(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
 
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    rank: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=99, server_default="99"
-    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False, default=99, server_default="99")
 
     permissions: Mapped[list[Permission]] = relationship(
         secondary=role_permissions, back_populates="roles", lazy="selectin"
@@ -95,9 +91,7 @@ class Permission(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "module_id", "action", name="permissions_module_id_action_key"
-        ),
+        UniqueConstraint("module_id", "action", name="permissions_module_id_action_key"),
         Index("permissions_module_id_idx", "module_id"),
         Index("permissions_deleted_at_idx", "deleted_at"),
     )

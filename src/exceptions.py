@@ -2,12 +2,6 @@ from fastapi import status
 
 
 class AppException(Exception):
-    """Base for all domain exceptions. Subclasses set status_code/error_code/detail.
-
-    Caught by a single handler in main.py and rendered as an ErrorResponse. Never
-    catch bare Exception around route bodies — raise a specific subclass instead.
-    """
-
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
     error_code: str = "internal_error"
     detail: str = "An unexpected error occurred."

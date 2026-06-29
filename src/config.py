@@ -13,11 +13,7 @@ class Environment(StrEnum):
 
 
 class Settings(BaseSettings):
-    """Root application settings. Domain-specific config lives in <domain>/config.py."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     PROJECT_NAME: str = "py-forge"
     ENVIRONMENT: Environment = Environment.LOCAL

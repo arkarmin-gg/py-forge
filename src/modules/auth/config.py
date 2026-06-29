@@ -2,8 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AuthConfig(BaseSettings):
-    """Auth-domain settings. Env vars are prefixed AUTH_ (e.g. AUTH_JWT_SECRET)."""
-
     model_config = SettingsConfigDict(env_prefix="AUTH_", env_file=".env", extra="ignore")
 
     JWT_SECRET: str

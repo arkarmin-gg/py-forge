@@ -12,9 +12,6 @@ class StorageError(AppException):
 
 
 class StorageNotConfigured(AppException):
-    """A storage operation was attempted but S3 env vars (S3_BUCKET, S3_ACCESS_KEY_ID,
-    S3_SECRET_ACCESS_KEY) are not set."""
-
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     error_code = "storage_not_configured"
     detail = "File storage is not configured on this server."

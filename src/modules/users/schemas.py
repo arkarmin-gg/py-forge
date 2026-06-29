@@ -2,12 +2,10 @@ import uuid
 from datetime import datetime
 
 from src.modules.users.constants import LoginProvider, RegistrationStage
-from src.schemas import BaseSchema
+from src.schemas import ResponseSchema
 
 
-class UserRead(BaseSchema):
-    """Stub response model. The users domain is modeled but not yet wired to routes."""
-
+class UserRead(ResponseSchema):
     id: uuid.UUID
     phone: str
     email: str | None

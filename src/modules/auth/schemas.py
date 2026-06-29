@@ -1,16 +1,18 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from src.schemas import RequestSchema
 
 
-class TokenResponse(BaseModel):
+class TokenResponse(RequestSchema):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
 
 
-class RefreshRequest(BaseModel):
+class RefreshRequest(RequestSchema):
     refresh_token: str
 
 
-class ChangePasswordRequest(BaseModel):
+class ChangePasswordRequest(RequestSchema):
     current_password: str = Field(min_length=1, max_length=128)
     new_password: str = Field(min_length=8, max_length=128)

@@ -19,13 +19,6 @@ SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 @event.listens_for(Session, "do_orm_execute")
 def _filter_soft_deleted(state: ORMExecuteState) -> None:
-    """Exclude soft-deleted rows from every ORM SELECT by default (ADR 0002).
-
-    The event fires on the sync Session that AsyncSession wraps, so it covers async
-    queries too. To include deleted rows deliberately, pass the execution option:
-
-        await db.execute(stmt.execution_options(include_deleted=True))
-    """
     if (
         state.is_select
         and not state.is_column_load

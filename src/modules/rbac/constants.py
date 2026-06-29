@@ -6,3 +6,6 @@ class ActionType(StrEnum):
     READ = "READ"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
+
+
+SUPERADMIN_ROLE_NAME = "superadmin"

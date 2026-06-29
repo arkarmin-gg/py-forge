@@ -1,11 +1,3 @@
-"""Reusable object-storage operations, backed by S3 (or any S3-compatible store).
-
-Low-level primitives — upload_bytes / delete / presigned_url / public_url — work on
-raw keys and bytes and are domain-agnostic. The image helpers — upload_image /
-replace_image — add content-type and size validation on top for the common avatar case.
-Any domain can persist the returned `key` and resolve a URL from it later.
-"""
-
 import functools
 import uuid
 from contextlib import suppress
@@ -26,12 +18,12 @@ from src.storage.exceptions import FileTooLarge, StorageError, UnsupportedFileTy
 from src.storage.schemas import StoredObject
 
 
-def build_key(prefix: str, extension: str) -> str:
+def _build_key(prefix: str, extension: str) -> str:
     """A collision-free object key: `<prefix>/<random-hex>.<ext>`."""
     return f"{prefix.strip('/')}/{uuid.uuid4().hex}.{extension.lstrip('.')}"
 
 
-def public_url(key: str | None) -> str | None:
+def _public_url(key: str | None) -> str | None:
     """Resolve a stored key to a public URL. None in → None out.
 
     Prefers PUBLIC_BASE_URL (CDN / public origin); otherwise builds a virtual-hosted-style
@@ -46,7 +38,7 @@ def public_url(key: str | None) -> str | None:
     return f"https://{storage_settings.BUCKET}.s3.{storage_settings.REGION}.amazonaws.com/{key}"
 
 
-async def upload_bytes(data: bytes, *, key: str, content_type: str) -> StoredObject:
+async def _upload_bytes(data: bytes, *, key: str, content_type: str) -> StoredObject:
     """Put raw bytes at `key`. Overwrites any existing object at that key."""
     try:
         async with get_s3_client() as s3:
@@ -58,7 +50,8 @@ async def upload_bytes(data: bytes, *, key: str, content_type: str) -> StoredObj
             )
     except (BotoCoreError, ClientError) as exc:
         raise StorageError() from exc
-    return StoredObject(key=key, url=public_url(key))
+
+    return StoredObject(key=key, url=_public_url(key))
 
 
 async def delete(key: str) -> None:
@@ -75,7 +68,7 @@ def _presign_client():
     """A long-lived sync botocore client used solely to sign URLs.
 
     Presigning is local HMAC signing with no network I/O, so it needs neither aioboto3
-    nor async. Cached because client construction is comparatively expensive.
+    nor async. Cached because client construction is comparatively expensive. Singleton pattern.
     """
     return botocore.session.get_session().create_client(
         "s3",
@@ -89,13 +82,6 @@ def _presign_client():
 
 
 def presigned_url(key: str | None, *, expires_in: int | None = None) -> str | None:
-    """A time-limited URL to GET a (possibly private) object. None in → None out.
-
-    Synchronous on purpose: signing makes no network call, so this is safe to call
-    straight from request handlers and from the AdminRead.profile_image_url property
-    (an async property would hand Pydantic an un-awaited coroutine). Returns None when
-    storage is unconfigured, so read paths degrade gracefully instead of erroring.
-    """
     if not key or not storage_settings.is_configured:
         return None
     return _presign_client().generate_presigned_url(
@@ -115,21 +101,14 @@ async def upload_image(file: UploadFile, *, prefix: str) -> StoredObject:
     if len(data) > MAX_IMAGE_BYTES:
         raise FileTooLarge()
 
-    key = build_key(prefix, IMAGE_CONTENT_TYPE_EXTENSIONS[content_type])
-    return await upload_bytes(data, key=key, content_type=content_type)
+    key = _build_key(prefix, IMAGE_CONTENT_TYPE_EXTENSIONS[content_type])
+    return await _upload_bytes(data, key=key, content_type=content_type)
 
 
-async def replace_image(
-    old_key: str | None, file: UploadFile, *, prefix: str
-) -> StoredObject:
-    """Upload the new image first, then best-effort delete the old one.
-
-    The new object is committed before cleanup, so a failed delete can't lose the upload;
-    a stale object is preferable to a broken reference.
-    """
+async def replace_image(old_key: str | None, file: UploadFile, *, prefix: str) -> StoredObject:
+    """Upload the new image first, then best-effort delete the old one."""
     stored = await upload_image(file, prefix=prefix)
     if old_key and old_key != stored.key:
-        # orphaned object on failure is fine; sweep later rather than fail the request
         with suppress(StorageError):
             await delete(old_key)
     return stored
